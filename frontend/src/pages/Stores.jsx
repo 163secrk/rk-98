@@ -123,7 +123,17 @@ function StoreList() {
           <Form.Item name="address" label="门店地址" rules={[{ required: true }]}>
             <Input placeholder="请输入门店地址" />
           </Form.Item>
-          <Form.Item name="phone" label="联系电话" rules={[{ required: true }]}>
+          <Form.Item
+            name="phone"
+            label="联系电话"
+            rules={[
+              { required: true, message: '请输入联系电话' },
+              {
+                pattern: /^(1[3-9]\d{9}|0\d{2,3}-?\d{7,8})$/,
+                message: '联系电话格式不正确，请输入有效的手机号或座机号',
+              },
+            ]}
+          >
             <Input placeholder="请输入联系电话" />
           </Form.Item>
           <Form.Item name="manager" label="负责人">

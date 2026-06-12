@@ -151,3 +151,35 @@ body {
   font-size: 12px;
   font-weight: 500;
 }
+
+@media print {
+  .no-print {
+    display: none !important;
+  }
+
+  .ant-layout-sider,
+  .ant-layout-header {
+    display: none !important;
+  }
+
+  .ant-layout-content {
+    margin: 0 !important;
+    padding: 0 !important;
+    background: white !important;
+  }
+
+  .ant-layout {
+    background: white !important;
+  }
+
+  body {
+    background: white !important;
+  }
+
+  .voucher-container {
+    box-shadow: none !important;
+    max-width: 100% !important;
+    padding: 0 !important;
+    margin: 0 !important;
+  }
+}

@@ -137,6 +137,31 @@ export class OrdersService {
 
   async updateStatus(id: string, updateDto: UpdateOrderStatusDto): Promise<Order> {
     const order = await this.findOne(id);
+
+    const validTransitions: Record<OrderStatus, OrderStatus[]> = {
+      [OrderStatus.RECEIVED]: [OrderStatus.WASHING, OrderStatus.CANCELLED],
+      [OrderStatus.WASHING]: [OrderStatus.READY],
+      [OrderStatus.READY]: [OrderStatus.DELIVERED],
+      [OrderStatus.DELIVERED]: [],
+      [OrderStatus.CANCELLED]: [],
+    };
+
+    const allowed = validTransitions[order.status] || [];
+    if (!allowed.includes(updateDto.status)) {
+      throw new BadRequestException(
+        `订单状态不允许从「${this.getStatusText(order.status)}」变更为「${this.getStatusText(updateDto.status)}」`
+      );
+    }
+
+    if (updateDto.status === OrderStatus.DELIVERED) {
+      const unpaid = Number(order.totalAmount) - Number(order.paidAmount);
+      if (unpaid > 0) {
+        throw new BadRequestException(
+          `订单尚有 ¥${unpaid.toFixed(2)} 代收款未结清，无法标记为已取件`
+        );
+      }
+    }
+
     order.status = updateDto.status;
     return this.orderRepository.save(order);
   }

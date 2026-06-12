@@ -61,6 +61,7 @@ function MainLayout() {
         collapsible
         collapsed={collapsed}
         style={{ background: '#001529' }}
+        className="no-print"
       >
         <div className="app-logo">
           <span style={{ fontSize: 24 }}>🧺</span>
@@ -83,6 +84,7 @@ function MainLayout() {
             justifyContent: 'space-between',
             alignItems: 'center',
           }}
+          className="no-print"
         >
           <div style={{ fontSize: 16, fontWeight: 500 }}>
             连锁洗衣店O2O管理系统
