@@ -1,0 +1,71 @@
+import axios from 'axios';
+import { useAuthStore } from '../store/auth';
+
+const request = axios.create({
+  baseURL: '/api',
+  timeout: 10000,
+});
+
+request.interceptors.request.use(
+  (config) => {
+    const { token } = useAuthStore.getState();
+    if (token) {
+      config.headers.Authorization = `Bearer ${token}`;
+    }
+    return config;
+  },
+  (error) => Promise.reject(error)
+);
+
+request.interceptors.response.use(
+  (response) => response.data,
+  (error) => {
+    if (error.response?.status === 401) {
+      useAuthStore.getState().logout();
+      if (!window.location.pathname.includes('/login')) {
+        window.location.href = '/login';
+      }
+    }
+    return Promise.reject(error.response?.data || error);
+  }
+);
+
+export const authApi = {
+  login: (data) => request.post('/auth/login', data),
+  getProfile: () => request.get('/auth/profile'),
+};
+
+export const storesApi = {
+  list: () => request.get('/stores'),
+  get: (id) => request.get(`/stores/${id}`),
+  create: (data) => request.post('/stores', data),
+  update: (id, data) => request.patch(`/stores/${id}`, data),
+  remove: (id) => request.delete(`/stores/${id}`),
+};
+
+export const staffApi = {
+  list: () => request.get('/staff'),
+  get: (id) => request.get(`/staff/${id}`),
+  create: (data) => request.post('/staff', data),
+  update: (id, data) => request.patch(`/staff/${id}`, data),
+  remove: (id) => request.delete(`/staff/${id}`),
+};
+
+export const clothingApi = {
+  list: () => request.get('/clothing-types'),
+  active: () => request.get('/clothing-types/active/list'),
+  get: (id) => request.get(`/clothing-types/${id}`),
+  create: (data) => request.post('/clothing-types', data),
+  update: (id, data) => request.patch(`/clothing-types/${id}`, data),
+  remove: (id) => request.delete(`/clothing-types/${id}`),
+};
+
+export const ordersApi = {
+  list: (params) => request.get('/orders', { params }),
+  get: (id) => request.get(`/orders/${id}`),
+  getByNo: (orderNo) => request.get(`/orders/no/${orderNo}`),
+  create: (data) => request.post('/orders', data),
+  updateStatus: (id, data) => request.patch(`/orders/${id}/status`, data),
+  getVoucher: (id) => request.get(`/orders/${id}/voucher`),
+  getStats: (params) => request.get('/orders/stats/summary', { params }),
+};
