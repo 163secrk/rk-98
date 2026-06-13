@@ -13,6 +13,7 @@ import Voucher from './pages/Voucher';
 import Members from './pages/Members';
 import Packages from './pages/Packages';
 import Consumables from './pages/Consumables';
+import DailyReport from './pages/DailyReport';
 
 function PrivateRoute({ children }) {
   const { token } = useAuthStore();
@@ -42,6 +43,7 @@ function App() {
         <Route path="members" element={<Members />} />
         <Route path="packages" element={<Packages />} />
         <Route path="consumables" element={<Consumables />} />
+        <Route path="reports/daily" element={<DailyReport />} />
       </Route>
     </Routes>
   );

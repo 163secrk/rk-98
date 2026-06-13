@@ -12,6 +12,7 @@ import {
   CrownOutlined,
   GiftOutlined,
   InboxOutlined,
+  PieChartOutlined,
 } from '@ant-design/icons';
 import { useNavigate, useLocation, Outlet } from 'react-router-dom';
 import { useAuthStore } from '../store/auth';
@@ -37,6 +38,7 @@ function MainLayout() {
     { key: '/staff', icon: <TeamOutlined />, label: '员工管理' },
     { key: '/clothing-types', icon: <AppstoreOutlined />, label: '衣物类型' },
     { key: '/consumables', icon: <InboxOutlined />, label: '耗材管理' },
+    { key: '/reports/daily', icon: <PieChartOutlined />, label: '财务日结报表' },
   ];
 
   const handleLogout = () => {

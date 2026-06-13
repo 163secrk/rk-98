@@ -109,3 +109,12 @@ export const consumablesApi = {
   getRecommendedForWash: (params) => request.get('/consumables/recommended/wash', { params }),
   getOrderRecords: (orderId) => request.get(`/consumables/order/${orderId}/records`),
 };
+
+export const reportsApi = {
+  getDailyReport: (params) => request.get('/reports/daily', { params }),
+  exportDailyReport: (params) =>
+    request.get('/reports/daily/export', {
+      params,
+      responseType: 'blob',
+    }),
+};

@@ -9,6 +9,7 @@ import { OrdersModule } from './orders/orders.module';
 import { MembersModule } from './members/members.module';
 import { PackagesModule } from './packages/packages.module';
 import { ConsumablesModule } from './consumables/consumables.module';
+import { ReportsModule } from './reports/reports.module';
 import { Store } from './entities/store.entity';
 import { Staff } from './entities/staff.entity';
 import { Customer } from './entities/customer.entity';
@@ -44,6 +45,7 @@ import { ConsumablesService } from './consumables/consumables.service';
     MembersModule,
     PackagesModule,
     ConsumablesModule,
+    ReportsModule,
   ],
 })
 export class AppModule implements OnModuleInit {
