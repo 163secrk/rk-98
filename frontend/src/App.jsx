@@ -12,6 +12,7 @@ import CreateOrder from './pages/CreateOrder';
 import Voucher from './pages/Voucher';
 import Members from './pages/Members';
 import Packages from './pages/Packages';
+import Consumables from './pages/Consumables';
 
 function PrivateRoute({ children }) {
   const { token } = useAuthStore();
@@ -40,6 +41,7 @@ function App() {
         <Route path="orders/voucher/:id" element={<Voucher />} />
         <Route path="members" element={<Members />} />
         <Route path="packages" element={<Packages />} />
+        <Route path="consumables" element={<Consumables />} />
       </Route>
     </Routes>
   );

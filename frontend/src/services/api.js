@@ -94,3 +94,16 @@ export const packagesApi = {
   update: (id, data) => request.patch(`/packages/${id}`, data),
   remove: (id) => request.delete(`/packages/${id}`),
 };
+
+export const consumablesApi = {
+  list: (params) => request.get('/consumables', { params }),
+  get: (id) => request.get(`/consumables/${id}`),
+  create: (data) => request.post('/consumables', data),
+  update: (id, data) => request.patch(`/consumables/${id}`, data),
+  remove: (id) => request.delete(`/consumables/${id}`),
+  inbound: (id, data) => request.post(`/consumables/${id}/inbound`, data),
+  consume: (id, data) => request.post(`/consumables/${id}/consume`, data),
+  adjust: (id, data) => request.post(`/consumables/${id}/adjust`, data),
+  getLowStockAlerts: (params) => request.get('/consumables/alerts/low-stock', { params }),
+  getRecords: (params) => request.get('/consumables/records', { params }),
+};

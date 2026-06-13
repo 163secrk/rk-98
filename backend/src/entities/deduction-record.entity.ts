@@ -29,7 +29,7 @@ export class DeductionRecord {
   @JoinColumn({ name: 'memberId' })
   member: Member;
 
-  @Column()
+  @Column({ nullable: true })
   orderId: string;
 
   @ManyToOne(() => Order)

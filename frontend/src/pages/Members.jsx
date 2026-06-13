@@ -242,7 +242,7 @@ function Members() {
       width: 240,
       render: (_, r) => (
         <Space size="small">
-          <Button type="link" size="small" onClick={() => openDetail(r)}>详情</Button>
+          <Button type="link" size="small" onClick={() => openDetail(r.id)}>详情</Button>
           <Button type="link" size="small" onClick={() => openRecharge(r)} disabled={!r.isActive}>充值</Button>
           <Button type="link" size="small" onClick={() => openPurchase(r)} disabled={!r.isActive}>购套餐</Button>
           <Popconfirm title={r.isActive ? '确定停用该会员？' : '确定启用该会员？'} onConfirm={() => toggleMemberStatus(r)}>

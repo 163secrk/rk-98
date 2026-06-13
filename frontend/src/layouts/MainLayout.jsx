@@ -11,6 +11,7 @@ import {
   LogoutOutlined,
   CrownOutlined,
   GiftOutlined,
+  InboxOutlined,
 } from '@ant-design/icons';
 import { useNavigate, useLocation, Outlet } from 'react-router-dom';
 import { useAuthStore } from '../store/auth';
@@ -35,6 +36,7 @@ function MainLayout() {
     { key: '/stores', icon: <ShopOutlined />, label: '门店管理' },
     { key: '/staff', icon: <TeamOutlined />, label: '员工管理' },
     { key: '/clothing-types', icon: <AppstoreOutlined />, label: '衣物类型' },
+    { key: '/consumables', icon: <InboxOutlined />, label: '耗材管理' },
   ];
 
   const handleLogout = () => {
