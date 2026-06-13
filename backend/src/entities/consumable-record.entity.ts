@@ -8,6 +8,7 @@ import {
 } from 'typeorm';
 import { Consumable } from './consumable.entity';
 import { Staff } from './staff.entity';
+import { Order } from './order.entity';
 
 export enum ConsumableRecordType {
   INBOUND = 'inbound',
@@ -55,6 +56,10 @@ export class ConsumableRecord {
 
   @Column({ nullable: true })
   orderId: string;
+
+  @ManyToOne(() => Order, { nullable: true })
+  @JoinColumn({ name: 'orderId' })
+  order: Order;
 
   @Column({
     type: 'simple-enum',

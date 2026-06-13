@@ -203,6 +203,7 @@ export class ConsumablesService {
       .createQueryBuilder('record')
       .leftJoinAndSelect('record.consumable', 'consumable')
       .leftJoinAndSelect('record.operator', 'operator')
+      .leftJoinAndSelect('record.order', 'order')
       .orderBy('record.createdAt', 'DESC');
 
     if (query.consumableId) {
@@ -254,7 +255,7 @@ export class ConsumablesService {
     operator?: Staff,
   ): Promise<void> {
     const existing = await this.consumableRecordRepository.findOne({
-      where: { orderId, consumeSource: source },
+      where: { orderId, consumeSource: source, recordType: ConsumableRecordType.CONSUME },
     });
     if (existing) {
       return;
@@ -270,6 +271,14 @@ export class ConsumablesService {
       if (source === ConsumeSource.WASH) {
         if (consumable.name.includes('洗衣液') || consumable.name.includes('洗涤剂')) {
           consumeAmount = totalItems * 0.05;
+        } else if (consumable.name.includes('柔顺剂')) {
+          consumeAmount = totalItems * 0.03;
+        } else if (consumable.name.includes('去渍剂')) {
+          consumeAmount = Math.ceil(totalItems * 0.1);
+        } else if (consumable.name.includes('衣架')) {
+          consumeAmount = totalItems;
+        } else if (consumable.name.includes('洗衣袋')) {
+          consumeAmount = Math.ceil(totalItems * 0.5);
         }
       }
 
@@ -286,9 +295,58 @@ export class ConsumablesService {
           operatorId: operator?.id,
           orderId,
           consumeSource: source,
-          remark: `${source === ConsumeSource.WASH ? '洗涤' : '烘干'}订单自动扣减`,
+          remark: `${source === ConsumeSource.WASH ? '洗涤' : '烘干'}订单自动出库`,
         });
         await this.consumableRecordRepository.save(record);
+      }
+    }
+  }
+
+  async returnByOrder(
+    orderId: string,
+    storeId: string,
+    operator?: Staff,
+  ): Promise<void> {
+    const existing = await this.consumableRecordRepository.findOne({
+      where: { orderId, recordType: ConsumableRecordType.RETURN },
+    });
+    if (existing) {
+      return;
+    }
+
+    const consumedRecords = await this.consumableRecordRepository.find({
+      where: {
+        orderId,
+        recordType: ConsumableRecordType.CONSUME,
+      },
+      relations: ['consumable'],
+    });
+
+    for (const record of consumedRecords) {
+      if (!record.consumable) continue;
+
+      if (record.consumable.type === ConsumableType.RECYCLABLE) {
+        const consumable = await this.consumableRepository.findOne({
+          where: { id: record.consumableId },
+        });
+        if (!consumable) continue;
+
+        const returnAmount = Number(record.quantity);
+        const newStock = Number(consumable.stock) + returnAmount;
+        consumable.stock = newStock;
+        await this.consumableRepository.save(consumable);
+
+        const returnRecord = this.consumableRecordRepository.create({
+          consumableId: consumable.id,
+          recordType: ConsumableRecordType.RETURN,
+          quantity: returnAmount,
+          stockAfter: newStock,
+          operatorId: operator?.id,
+          orderId,
+          consumeSource: record.consumeSource,
+          remark: `订单完成自动归还入库`,
+        });
+        await this.consumableRecordRepository.save(returnRecord);
       }
     }
   }

@@ -203,7 +203,19 @@ export class OrdersService {
           operator,
         );
       } catch (err) {
-        order.remark = (order.remark || '') + ` [耗材扣减失败: ${err.message}]`;
+        order.remark = (order.remark || '') + ` [耗材出库失败: ${err.message}]`;
+      }
+    }
+
+    if (updateDto.status === OrderStatus.READY) {
+      try {
+        await this.consumablesService.returnByOrder(
+          order.id,
+          order.storeId,
+          operator,
+        );
+      } catch (err) {
+        order.remark = (order.remark || '') + ` [耗材归还失败: ${err.message}]`;
       }
     }
 

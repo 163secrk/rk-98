@@ -379,6 +379,11 @@ function Consumables() {
     { title: '类型', dataIndex: 'recordType', width: 80, render: (v) => { const t = recordTypeMap[v]; return t ? <Tag color={t.color}>{t.text}</Tag> : v; } },
     { title: '数量', dataIndex: 'quantity', width: 100, render: (v, r) => `${Number(v).toFixed(2)}${r.consumable?.unit || ''}` },
     { title: '变动后库存', dataIndex: 'stockAfter', width: 110, render: (v, r) => `${Number(v).toFixed(2)}${r.consumable?.unit || ''}` },
+    { title: '关联订单', dataIndex: 'order', width: 150, render: (_, r) => r.order ? (
+      <Tooltip title={`客户: ${r.order.customerName || '-'}`}>
+        <Tag color="purple" style={{ cursor: 'pointer' }}>{r.order.orderNo}</Tag>
+      </Tooltip>
+    ) : '-' },
     { title: '操作人', dataIndex: 'operator', width: 100, render: (_, r) => r.operator?.realName || '-' },
     { title: '批次号', dataIndex: 'batchNo', width: 100, render: (v) => v || '-' },
     { title: '备注', dataIndex: 'remark', render: (v) => v || '-' },
@@ -501,7 +506,7 @@ function Consumables() {
           rowKey="id"
           loading={recordsLoading}
           pagination={{ pageSize: 20, showTotal: (t) => `共 ${t} 条记录` }}
-          scroll={{ x: 1000 }}
+          scroll={{ x: 1200 }}
         />
       ),
     },
