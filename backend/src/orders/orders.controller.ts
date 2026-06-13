@@ -50,7 +50,7 @@ export class OrdersController {
   }
 
   @Patch(':id/status')
-  updateStatus(@Param('id') id: string, @Body() updateDto: UpdateOrderStatusDto) {
-    return this.ordersService.updateStatus(id, updateDto);
+  updateStatus(@Param('id') id: string, @Body() updateDto: UpdateOrderStatusDto, @Request() req) {
+    return this.ordersService.updateStatus(id, updateDto, req.user);
   }
 }

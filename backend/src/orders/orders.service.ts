@@ -7,6 +7,8 @@ import { Customer } from '../entities/customer.entity';
 import { Staff } from '../entities/staff.entity';
 import { CreateOrderDto, UpdateOrderStatusDto } from './dto/order.dto';
 import { MembersService, DeductItem } from '../members/members.service';
+import { ConsumablesService } from '../consumables/consumables.service';
+import { ConsumeSource } from '../entities/consumable-record.entity';
 import { v4 as uuidv4 } from 'uuid';
 
 @Injectable()
@@ -19,6 +21,7 @@ export class OrdersService {
     @InjectRepository(Customer)
     private readonly customerRepository: Repository<Customer>,
     private readonly membersService: MembersService,
+    private readonly consumablesService: ConsumablesService,
   ) {}
 
   private generateOrderNo(): string {
@@ -162,7 +165,7 @@ export class OrdersService {
     return order;
   }
 
-  async updateStatus(id: string, updateDto: UpdateOrderStatusDto): Promise<Order> {
+  async updateStatus(id: string, updateDto: UpdateOrderStatusDto, operator?: Staff): Promise<Order> {
     const order = await this.findOne(id);
 
     const validTransitions: Record<OrderStatus, OrderStatus[]> = {
@@ -186,6 +189,21 @@ export class OrdersService {
         throw new BadRequestException(
           `订单尚有 ¥${unpaid.toFixed(2)} 代收款未结清，无法标记为已取件`
         );
+      }
+    }
+
+    if (updateDto.status === OrderStatus.WASHING) {
+      const totalItems = order.items.reduce((sum, item) => sum + item.quantity, 0);
+      try {
+        await this.consumablesService.consumeByOrder(
+          order.id,
+          order.storeId,
+          totalItems,
+          ConsumeSource.WASH,
+          operator,
+        );
+      } catch (err) {
+        order.remark = (order.remark || '') + ` [耗材扣减失败: ${err.message}]`;
       }
     }
 
