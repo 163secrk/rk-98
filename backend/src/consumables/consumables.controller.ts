@@ -112,4 +112,17 @@ export class ConsumablesController {
   ) {
     return this.consumablesService.adjust(id, adjustDto, req.user);
   }
+
+  @Get('recommended/wash')
+  getRecommendedConsumables(
+    @Query('storeId') storeId: string,
+    @Query('totalItems') totalItems: number,
+  ) {
+    return this.consumablesService.getRecommendedConsumables(storeId, Number(totalItems));
+  }
+
+  @Get('order/:orderId/records')
+  getOrderConsumableRecords(@Param('orderId') orderId: string) {
+    return this.consumablesService.getOrderConsumableRecords(orderId);
+  }
 }

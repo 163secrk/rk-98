@@ -247,59 +247,83 @@ export class ConsumablesService {
     return qb.getMany();
   }
 
-  async consumeByOrder(
-    orderId: string,
-    storeId: string,
-    totalItems: number,
-    source: ConsumeSource,
-    operator?: Staff,
-  ): Promise<void> {
-    const existing = await this.consumableRecordRepository.findOne({
-      where: { orderId, consumeSource: source, recordType: ConsumableRecordType.CONSUME },
-    });
-    if (existing) {
-      return;
-    }
-
+  async getRecommendedConsumables(storeId: string, totalItems: number) {
     const consumables = await this.consumableRepository.find({
       where: { storeId, status: ConsumableStatus.ACTIVE },
     });
 
-    for (const consumable of consumables) {
-      let consumeAmount = 0;
+    return consumables.map((consumable) => {
+      let recommendedQuantity = 0;
 
-      if (source === ConsumeSource.WASH) {
-        if (consumable.name.includes('洗衣液') || consumable.name.includes('洗涤剂')) {
-          consumeAmount = totalItems * 0.05;
-        } else if (consumable.name.includes('柔顺剂')) {
-          consumeAmount = totalItems * 0.03;
-        } else if (consumable.name.includes('去渍剂')) {
-          consumeAmount = Math.ceil(totalItems * 0.1);
-        } else if (consumable.name.includes('衣架')) {
-          consumeAmount = totalItems;
-        } else if (consumable.name.includes('洗衣袋')) {
-          consumeAmount = Math.ceil(totalItems * 0.5);
-        }
+      if (consumable.name.includes('洗衣液') || consumable.name.includes('洗涤剂')) {
+        recommendedQuantity = totalItems * 0.05;
+      } else if (consumable.name.includes('柔顺剂')) {
+        recommendedQuantity = totalItems * 0.03;
+      } else if (consumable.name.includes('去渍剂')) {
+        recommendedQuantity = Math.ceil(totalItems * 0.1);
+      } else if (consumable.name.includes('衣架')) {
+        recommendedQuantity = totalItems;
+      } else if (consumable.name.includes('洗衣袋')) {
+        recommendedQuantity = Math.ceil(totalItems * 0.5);
       }
 
-      if (consumeAmount > 0 && Number(consumable.stock) >= consumeAmount) {
-        const newStock = Number(consumable.stock) - consumeAmount;
-        consumable.stock = newStock;
-        await this.consumableRepository.save(consumable);
+      return {
+        consumableId: consumable.id,
+        consumableName: consumable.name,
+        unit: consumable.unit,
+        stock: consumable.stock,
+        recommendedQuantity: Number(recommendedQuantity.toFixed(2)),
+        type: consumable.type,
+      };
+    });
+  }
 
-        const record = this.consumableRecordRepository.create({
+  async consumeByOrderConfig(
+    orderId: string,
+    storeId: string,
+    consumables: Array<{ consumableId: string; consumableName: string; quantity: number; unit?: string }>,
+    source: ConsumeSource,
+    operator?: Staff,
+  ): Promise<void> {
+    return this.dataSource.transaction(async (manager) => {
+      const existing = await manager.findOne(ConsumableRecord, {
+        where: { orderId, consumeSource: source, recordType: ConsumableRecordType.CONSUME },
+      });
+      if (existing) {
+        throw new BadRequestException('该订单已执行过耗材出库');
+      }
+
+      for (const item of consumables) {
+        if (item.quantity <= 0) continue;
+
+        const consumable = await manager.findOne(Consumable, {
+          where: { id: item.consumableId, storeId },
+        });
+        if (!consumable) {
+          throw new BadRequestException(`耗材「${item.consumableName}」不存在`);
+        }
+
+        if (Number(consumable.stock) < Number(item.quantity)) {
+          throw new BadRequestException(`耗材「${consumable.name}」库存不足，当前库存：${consumable.stock}${consumable.unit}`);
+        }
+
+        const newStock = Number(consumable.stock) - Number(item.quantity);
+        consumable.stock = newStock;
+        await manager.save(consumable);
+
+        const record = manager.create(ConsumableRecord, {
           consumableId: consumable.id,
           recordType: ConsumableRecordType.CONSUME,
-          quantity: consumeAmount,
+          quantity: item.quantity,
           stockAfter: newStock,
           operatorId: operator?.id,
           orderId,
           consumeSource: source,
-          remark: `${source === ConsumeSource.WASH ? '洗涤' : '烘干'}订单自动出库`,
+          remark: `${source === ConsumeSource.WASH ? '洗涤' : '烘干'}订单耗材出库`,
         });
-        await this.consumableRecordRepository.save(record);
+        await manager.save(record);
       }
-    }
+    });
   }
 
   async returnByOrder(
@@ -307,48 +331,67 @@ export class ConsumablesService {
     storeId: string,
     operator?: Staff,
   ): Promise<void> {
-    const existing = await this.consumableRecordRepository.findOne({
-      where: { orderId, recordType: ConsumableRecordType.RETURN },
-    });
-    if (existing) {
-      return;
-    }
-
-    const consumedRecords = await this.consumableRecordRepository.find({
-      where: {
-        orderId,
-        recordType: ConsumableRecordType.CONSUME,
-      },
-      relations: ['consumable'],
-    });
-
-    for (const record of consumedRecords) {
-      if (!record.consumable) continue;
-
-      if (record.consumable.type === ConsumableType.RECYCLABLE) {
-        const consumable = await this.consumableRepository.findOne({
-          where: { id: record.consumableId },
-        });
-        if (!consumable) continue;
-
-        const returnAmount = Number(record.quantity);
-        const newStock = Number(consumable.stock) + returnAmount;
-        consumable.stock = newStock;
-        await this.consumableRepository.save(consumable);
-
-        const returnRecord = this.consumableRecordRepository.create({
-          consumableId: consumable.id,
-          recordType: ConsumableRecordType.RETURN,
-          quantity: returnAmount,
-          stockAfter: newStock,
-          operatorId: operator?.id,
-          orderId,
-          consumeSource: record.consumeSource,
-          remark: `订单完成自动归还入库`,
-        });
-        await this.consumableRecordRepository.save(returnRecord);
+    return this.dataSource.transaction(async (manager) => {
+      const existing = await manager.findOne(ConsumableRecord, {
+        where: { orderId, recordType: ConsumableRecordType.RETURN },
+      });
+      if (existing) {
+        return;
       }
-    }
+
+      const consumedRecords = await manager.find(ConsumableRecord, {
+        where: {
+          orderId,
+          recordType: ConsumableRecordType.CONSUME,
+        },
+        relations: ['consumable'],
+      });
+
+      for (const record of consumedRecords) {
+        if (!record.consumable) continue;
+
+        if (record.consumable.type === ConsumableType.RECYCLABLE) {
+          const consumable = await manager.findOne(Consumable, {
+            where: { id: record.consumableId },
+          });
+          if (!consumable) continue;
+
+          const returnAmount = Number(record.quantity);
+          const newStock = Number(consumable.stock) + returnAmount;
+          consumable.stock = newStock;
+          await manager.save(consumable);
+
+          const returnRecord = manager.create(ConsumableRecord, {
+            consumableId: consumable.id,
+            recordType: ConsumableRecordType.RETURN,
+            quantity: returnAmount,
+            stockAfter: newStock,
+            operatorId: operator?.id,
+            orderId,
+            consumeSource: record.consumeSource,
+            remark: `订单完成归还入库`,
+          });
+          await manager.save(returnRecord);
+        }
+      }
+    });
+  }
+
+  async getOrderConsumableRecords(orderId: string): Promise<ConsumableRecord[]> {
+    const records = await this.consumableRecordRepository
+      .createQueryBuilder('record')
+      .leftJoinAndSelect('record.consumable', 'consumable')
+      .leftJoinAndSelect('record.operator', 'operator')
+      .where('record.orderId = :orderId', { orderId })
+      .orderBy('record.createdAt', 'ASC')
+      .getMany();
+
+    return records.map((r) => {
+      if (r.operator) {
+        delete r.operator.password;
+      }
+      return r;
+    });
   }
 
   async initDefaultData() {

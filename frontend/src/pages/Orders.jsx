@@ -4,6 +4,7 @@ import {
   Button,
   Space,
   Input,
+  InputNumber,
   Select,
   DatePicker,
   Tag,
@@ -15,10 +16,11 @@ import {
   PlusOutlined,
   FileTextOutlined,
   ReloadOutlined,
+  DeleteOutlined,
 } from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
 import dayjs from 'dayjs';
-import { ordersApi, storesApi } from '../services/api';
+import { ordersApi, storesApi, consumablesApi } from '../services/api';
 import { useAuthStore } from '../store/auth';
 
 const { RangePicker } = DatePicker;
@@ -30,6 +32,12 @@ function OrderList() {
   const [loading, setLoading] = useState(false);
   const [detailOpen, setDetailOpen] = useState(false);
   const [detail, setDetail] = useState(null);
+  const [consumableModalOpen, setConsumableModalOpen] = useState(false);
+  const [selectedOrder, setSelectedOrder] = useState(null);
+  const [recommendedConsumables, setRecommendedConsumables] = useState([]);
+  const [allConsumables, setAllConsumables] = useState([]);
+  const [selectedConsumables, setSelectedConsumables] = useState([]);
+  const [consumableLoading, setConsumableLoading] = useState(false);
   const [filters, setFilters] = useState({
     keyword: '',
     status: undefined,
@@ -95,6 +103,36 @@ function OrderList() {
   const handleChangeStatus = async (record) => {
     const nextStatus = nextStatusMap[record.status];
     if (!nextStatus) return;
+
+    if (nextStatus === 'washing') {
+      setSelectedOrder(record);
+      setConsumableLoading(true);
+      try {
+        const totalItems = record.items.reduce((sum, item) => sum + item.quantity, 0);
+        const storeId = record.storeId || user?.storeId;
+        const [recommended, allConsumableList] = await Promise.all([
+          consumablesApi.getRecommendedForWash({ storeId, totalItems }),
+          consumablesApi.list({ storeId }),
+        ]);
+        setRecommendedConsumables(recommended);
+        setAllConsumables(allConsumableList.filter(c => c.status === 'active'));
+        setSelectedConsumables(
+          recommended
+            .filter(item => item.recommendedQuantity > 0)
+            .map(item => ({
+              ...item,
+              quantity: item.recommendedQuantity,
+            }))
+        );
+        setConsumableModalOpen(true);
+      } catch (err) {
+        message.error(err.message || '获取耗材列表失败');
+      } finally {
+        setConsumableLoading(false);
+      }
+      return;
+    }
+
     Modal.confirm({
       title: '确认操作',
       content: `确定将订单状态更新为「${statusMap[nextStatus].text}」吗？`,
@@ -108,6 +146,85 @@ function OrderList() {
         }
       },
     });
+  };
+
+  const handleConsumableQuantityChange = (index, value) => {
+    const newSelected = [...selectedConsumables];
+    newSelected[index] = {
+      ...newSelected[index],
+      quantity: Math.max(0, Number(value) || 0),
+    };
+    setSelectedConsumables(newSelected);
+  };
+
+  const handleRemoveConsumable = (index) => {
+    setSelectedConsumables(selectedConsumables.filter((_, i) => i !== index));
+  };
+
+  const handleAddConsumable = (consumableId) => {
+    const recommendedItem = recommendedConsumables.find(c => c.consumableId === consumableId);
+    if (recommendedItem) {
+      if (selectedConsumables.some(c => c.consumableId === consumableId)) return;
+      setSelectedConsumables([...selectedConsumables, { ...recommendedItem, quantity: 0 }]);
+      return;
+    }
+
+    const allItem = allConsumables.find(c => c.id === consumableId);
+    if (!allItem) return;
+    if (selectedConsumables.some(c => c.consumableId === consumableId)) return;
+    setSelectedConsumables([
+      ...selectedConsumables,
+      {
+        consumableId: allItem.id,
+        consumableName: allItem.name,
+        unit: allItem.unit,
+        stock: allItem.stock,
+        recommendedQuantity: 0,
+        type: allItem.type,
+        quantity: 0,
+      },
+    ]);
+  };
+
+  const availableConsumablesToAdd = allConsumables.filter(
+    c => !selectedConsumables.some(s => s.consumableId === c.id)
+  );
+
+  const handleConfirmWashing = async () => {
+    if (!selectedOrder) return;
+
+    const validConsumables = selectedConsumables.filter(c => c.quantity > 0);
+    if (validConsumables.length === 0) {
+      message.error('请至少选择一种耗材并填写用量');
+      return;
+    }
+
+    for (const c of validConsumables) {
+      if (c.quantity > c.stock) {
+        message.error(`耗材「${c.consumableName}」用量超过库存（当前库存：${c.stock}${c.unit}）`);
+        return;
+      }
+    }
+
+    setConsumableLoading(true);
+    try {
+      await ordersApi.updateStatus(selectedOrder.id, {
+        status: 'washing',
+        consumables: validConsumables.map(c => ({
+          consumableId: c.consumableId,
+          consumableName: c.consumableName,
+          quantity: c.quantity,
+          unit: c.unit,
+        })),
+      });
+      message.success('开始洗涤成功，耗材已出库');
+      setConsumableModalOpen(false);
+      loadList();
+    } catch (err) {
+      message.error(err.message || '开始洗涤失败');
+    } finally {
+      setConsumableLoading(false);
+    }
   };
 
   const handleViewDetail = async (record) => {
@@ -249,7 +366,7 @@ function OrderList() {
             关闭
           </Button>,
         ]}
-        width={600}
+        width={700}
       >
         {detail && (
           <div>
@@ -273,6 +390,114 @@ function OrderList() {
                 { title: '小计', dataIndex: 'subtotal', render: (v) => `¥${Number(v).toFixed(2)}` },
               ]}
             />
+            {detail.consumableRecords && detail.consumableRecords.length > 0 && (
+              <>
+                <h4 style={{ marginTop: 20, marginBottom: 12 }}>耗材消耗明细</h4>
+                {(() => {
+                  const consumeRecords = detail.consumableRecords.filter(r => r.recordType === 'consume');
+                  const returnRecords = detail.consumableRecords.filter(r => r.recordType === 'return');
+
+                  const consumeSummary = consumeRecords.reduce((acc, r) => {
+                    const name = r.consumable?.name || r.consumableName;
+                    const unit = r.consumable?.unit || '';
+                    if (!acc[name]) {
+                      acc[name] = { name, unit, total: 0 };
+                    }
+                    acc[name].total += Number(r.quantity);
+                    return acc;
+                  }, {});
+
+                  const returnSummary = returnRecords.reduce((acc, r) => {
+                    const name = r.consumable?.name || r.consumableName;
+                    const unit = r.consumable?.unit || '';
+                    if (!acc[name]) {
+                      acc[name] = { name, unit, total: 0 };
+                    }
+                    acc[name].total += Number(r.quantity);
+                    return acc;
+                  }, {});
+
+                  const netConsume = {};
+                  Object.keys(consumeSummary).forEach(name => {
+                    netConsume[name] = {
+                      name,
+                      unit: consumeSummary[name].unit,
+                      consume: consumeSummary[name].total,
+                      return: returnSummary[name]?.total || 0,
+                      net: consumeSummary[name].total - (returnSummary[name]?.total || 0),
+                    };
+                  });
+
+                  const typeMap = {
+                    inbound: { text: '入库', color: 'green' },
+                    consume: { text: '出库', color: 'red' },
+                    return: { text: '归还', color: 'blue' },
+                    adjust: { text: '调整', color: 'orange' },
+                  };
+
+                  return (
+                    <>
+                      <Card size="small" style={{ marginBottom: 12 }} title="耗材消耗汇总">
+                        <Table
+                          size="small"
+                          dataSource={Object.values(netConsume)}
+                          rowKey="name"
+                          pagination={false}
+                          columns={[
+                            { title: '耗材名称', dataIndex: 'name' },
+                            { title: '单位', dataIndex: 'unit', width: 60 },
+                            {
+                              title: '出库量',
+                              dataIndex: 'consume',
+                              width: 80,
+                              render: (v, r) => <span style={{ color: '#f5222d' }}>{v}{r.unit}</span>,
+                            },
+                            {
+                              title: '归还量',
+                              dataIndex: 'return',
+                              width: 80,
+                              render: (v, r) => <span style={{ color: '#1890ff' }}>{v}{r.unit}</span>,
+                            },
+                            {
+                              title: '实际消耗',
+                              dataIndex: 'net',
+                              width: 90,
+                              render: (v, r) => (
+                                <span style={{ fontWeight: 'bold', color: v > 0 ? '#f5222d' : '#52c41a' }}>
+                                  {v}{r.unit}
+                                </span>
+                              ),
+                            },
+                          ]}
+                        />
+                      </Card>
+                      <Table
+                        size="small"
+                        dataSource={detail.consumableRecords}
+                        rowKey="id"
+                        pagination={false}
+                        columns={[
+                          { title: '耗材名称', dataIndex: ['consumable', 'name'], render: (v, r) => v || r.consumableName },
+                          {
+                            title: '操作类型',
+                            dataIndex: 'recordType',
+                            width: 80,
+                            render: (v) => {
+                              const info = typeMap[v] || { text: v, color: 'default' };
+                              return <Tag color={info.color}>{info.text}</Tag>;
+                            },
+                          },
+                          { title: '数量', dataIndex: 'quantity', width: 80, render: (v, r) => `${v}${r.consumable?.unit || ''}` },
+                          { title: '操作后库存', dataIndex: 'stockAfter', width: 100, render: (v, r) => `${v}${r.consumable?.unit || ''}` },
+                          { title: '操作员', dataIndex: ['operator', 'realName'], width: 80, render: (v) => v || '-' },
+                          { title: '操作时间', dataIndex: 'createdAt', width: 130, render: (v) => dayjs(v).format('YYYY-MM-DD HH:mm') },
+                        ]}
+                      />
+                    </>
+                  );
+                })()}
+              </>
+            )}
             <div style={{ marginTop: 12, textAlign: 'right', fontSize: 16, fontWeight: 'bold' }}>
               总计：¥{Number(detail.totalAmount).toFixed(2)}
               <span style={{ color: '#52c41a', marginLeft: 16 }}>已付：¥{Number(detail.paidAmount).toFixed(2)}</span>
@@ -282,6 +507,95 @@ function OrderList() {
             </div>
           </div>
         )}
+      </Modal>
+
+      <Modal
+        title="选择洗涤耗材"
+        open={consumableModalOpen}
+        onCancel={() => setConsumableModalOpen(false)}
+        width={750}
+        confirmLoading={consumableLoading}
+        onOk={handleConfirmWashing}
+        okText="确认开始洗涤"
+        cancelText="取消"
+      >
+        <div style={{ marginBottom: 12 }}>
+          <p style={{ color: '#666', margin: '0 0 8px 0' }}>
+            订单号：<span style={{ fontFamily: 'monospace', fontWeight: 'bold' }}>{selectedOrder?.orderNo}</span>
+          </p>
+          <p style={{ color: '#666', margin: '0 0 12px 0' }}>
+            系统已根据衣物数量推荐耗材用量，您可以调整实际用量，或添加其他耗材：
+          </p>
+          <div style={{ marginBottom: 12 }}>
+            <Select
+              placeholder="添加其他耗材..."
+              style={{ width: 240 }}
+              value={undefined}
+              onChange={handleAddConsumable}
+              showSearch
+              optionFilterProp="children"
+              disabled={availableConsumablesToAdd.length === 0}
+            >
+              {availableConsumablesToAdd.map((c) => (
+                <Select.Option key={c.id} value={c.id}>
+                  {c.name}（库存：{c.stock}{c.unit}）
+                </Select.Option>
+              ))}
+            </Select>
+            {availableConsumablesToAdd.length === 0 && (
+              <span style={{ color: '#999', marginLeft: 8, fontSize: 12 }}>已添加全部耗材</span>
+            )}
+          </div>
+        </div>
+        <Table
+          size="small"
+          dataSource={selectedConsumables}
+          rowKey="consumableId"
+          pagination={false}
+          columns={[
+            { title: '耗材名称', dataIndex: 'consumableName' },
+            { title: '类型', dataIndex: 'type', width: 80, render: (v) => v === 'recyclable' ? '可回收' : '一次性' },
+            { title: '单位', dataIndex: 'unit', width: 60 },
+            { title: '当前库存', dataIndex: 'stock', width: 90, render: (v, r) => `${v}${r.unit}` },
+            { title: '推荐用量', dataIndex: 'recommendedQuantity', width: 90, render: (v, r) => v > 0 ? `${v}${r.unit}` : '-' },
+            {
+              title: '实际用量',
+              dataIndex: 'quantity',
+              width: 150,
+              render: (v, record, index) => (
+                <InputNumber
+                  min={0}
+                  step={0.01}
+                  value={v}
+                  onChange={(value) => handleConsumableQuantityChange(index, value)}
+                  style={{ width: '100%' }}
+                  addonAfter={record.unit}
+                />
+              ),
+            },
+            {
+              title: '操作',
+              width: 60,
+              render: (_, record, index) => (
+                <Button
+                  type="text"
+                  danger
+                  size="small"
+                  icon={<DeleteOutlined />}
+                  onClick={() => handleRemoveConsumable(index)}
+                />
+              ),
+            },
+          ]}
+        />
+        <div style={{ marginTop: 12, color: '#faad14', fontSize: 12 }}>
+          <p style={{ margin: 0 }}>提示：</p>
+          <ul style={{ margin: '4px 0 0 16px', padding: 0 }}>
+            <li>请确认实际耗材用量后再开始洗涤</li>
+            <li>用量为0的耗材不会执行出库操作</li>
+            <li>可回收耗材（如衣架、洗衣袋）会在订单完成时自动归还入库</li>
+          </ul>
+        </div>
       </Modal>
     </div>
   );

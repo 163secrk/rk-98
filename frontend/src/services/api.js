@@ -106,4 +106,6 @@ export const consumablesApi = {
   adjust: (id, data) => request.post(`/consumables/${id}/adjust`, data),
   getLowStockAlerts: (params) => request.get('/consumables/alerts/low-stock', { params }),
   getRecords: (params) => request.get('/consumables/records', { params }),
+  getRecommendedForWash: (params) => request.get('/consumables/recommended/wash', { params }),
+  getOrderRecords: (orderId) => request.get(`/consumables/order/${orderId}/records`),
 };

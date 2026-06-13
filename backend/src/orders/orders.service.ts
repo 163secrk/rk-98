@@ -8,7 +8,7 @@ import { Staff } from '../entities/staff.entity';
 import { CreateOrderDto, UpdateOrderStatusDto } from './dto/order.dto';
 import { MembersService, DeductItem } from '../members/members.service';
 import { ConsumablesService } from '../consumables/consumables.service';
-import { ConsumeSource } from '../entities/consumable-record.entity';
+import { ConsumeSource, ConsumableRecord } from '../entities/consumable-record.entity';
 import { v4 as uuidv4 } from 'uuid';
 
 @Injectable()
@@ -141,7 +141,7 @@ export class OrdersService {
     });
   }
 
-  async findOne(id: string): Promise<Order> {
+  async findOne(id: string): Promise<Order & { consumableRecords?: ConsumableRecord[] }> {
     const order = await this.orderRepository.findOne({
       where: { id },
       relations: ['items', 'store', 'staff'],
@@ -150,7 +150,9 @@ export class OrdersService {
       throw new NotFoundException('订单不存在');
     }
     if (order.staff) delete order.staff.password;
-    return order;
+
+    const consumableRecords = await this.consumablesService.getOrderConsumableRecords(id);
+    return { ...order, consumableRecords };
   }
 
   async findByOrderNo(orderNo: string): Promise<Order> {
@@ -193,17 +195,25 @@ export class OrdersService {
     }
 
     if (updateDto.status === OrderStatus.WASHING) {
-      const totalItems = order.items.reduce((sum, item) => sum + item.quantity, 0);
+      if (!updateDto.consumables || updateDto.consumables.length === 0) {
+        throw new BadRequestException('请选择耗材及用量');
+      }
+
+      const hasValidConsumable = updateDto.consumables.some(c => Number(c.quantity) > 0);
+      if (!hasValidConsumable) {
+        throw new BadRequestException('请至少选择一种耗材并填写用量');
+      }
+
       try {
-        await this.consumablesService.consumeByOrder(
+        await this.consumablesService.consumeByOrderConfig(
           order.id,
           order.storeId,
-          totalItems,
+          updateDto.consumables,
           ConsumeSource.WASH,
           operator,
         );
       } catch (err) {
-        order.remark = (order.remark || '') + ` [耗材出库失败: ${err.message}]`;
+        throw new BadRequestException(`耗材出库失败: ${err.message}`);
       }
     }
 

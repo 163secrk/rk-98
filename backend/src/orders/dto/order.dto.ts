@@ -68,7 +68,42 @@ export class CreateOrderDto {
   items: OrderItemDto[];
 }
 
+export class OrderConsumableDto {
+  @IsUUID()
+  @IsNotEmpty()
+  consumableId: string;
+
+  @IsString()
+  @IsNotEmpty()
+  consumableName: string;
+
+  @IsNumber()
+  @Min(0)
+  quantity: number;
+
+  @IsString()
+  @IsOptional()
+  unit?: string;
+}
+
+export class StartWashingDto {
+  @IsEnum(OrderStatus)
+  status: OrderStatus;
+
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => OrderConsumableDto)
+  @IsOptional()
+  consumables?: OrderConsumableDto[];
+}
+
 export class UpdateOrderStatusDto {
   @IsEnum(OrderStatus)
   status: OrderStatus;
+
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => OrderConsumableDto)
+  @IsOptional()
+  consumables?: OrderConsumableDto[];
 }
