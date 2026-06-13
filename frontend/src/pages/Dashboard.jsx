@@ -5,12 +5,17 @@ import {
   DollarOutlined,
   RedEnvelopeOutlined,
   ScheduleOutlined,
+  CrownOutlined,
+  GiftOutlined,
+  TeamOutlined,
+  WalletOutlined,
 } from '@ant-design/icons';
-import { ordersApi } from '../services/api';
+import { ordersApi, membersApi } from '../services/api';
 import { useAuthStore } from '../store/auth';
 
 function Dashboard() {
   const [stats, setStats] = useState(null);
+  const [memberStats, setMemberStats] = useState(null);
   const [loading, setLoading] = useState(true);
   const { user } = useAuthStore();
 
@@ -24,8 +29,12 @@ function Dashboard() {
       if (user?.role === 'staff' && user?.storeId) {
         params.storeId = user.storeId;
       }
-      const res = await ordersApi.getStats(params);
-      setStats(res);
+      const [orderRes, memberRes] = await Promise.all([
+        ordersApi.getStats(params),
+        membersApi.getStats(),
+      ]);
+      setStats(orderRes);
+      setMemberStats(memberRes);
     } catch (err) {
       console.error(err);
     } finally {
@@ -84,6 +93,52 @@ function Dashboard() {
               prefix={<ScheduleOutlined style={{ color: '#f5222d' }} />}
               valueStyle={{ color: '#f5222d' }}
               suffix="元"
+            />
+          </Card>
+        </Col>
+      </Row>
+
+      <Row gutter={[16, 16]} style={{ marginTop: 16 }}>
+        <Col xs={24} sm={12} lg={6}>
+          <Card>
+            <Statistic
+              title="会员总数"
+              value={memberStats?.totalMembers || 0}
+              prefix={<TeamOutlined style={{ color: '#722ed1' }} />}
+              valueStyle={{ color: '#722ed1' }}
+            />
+          </Card>
+        </Col>
+        <Col xs={24} sm={12} lg={6}>
+          <Card>
+            <Statistic
+              title="活跃会员"
+              value={memberStats?.activeMembers || 0}
+              prefix={<CrownOutlined style={{ color: '#faad14' }} />}
+              valueStyle={{ color: '#faad14' }}
+            />
+          </Card>
+        </Col>
+        <Col xs={24} sm={12} lg={6}>
+          <Card>
+            <Statistic
+              title="会员总余额"
+              value={memberStats?.totalBalance || 0}
+              precision={2}
+              prefix={<WalletOutlined style={{ color: '#1677ff' }} />}
+              valueStyle={{ color: '#1677ff' }}
+              suffix="元"
+            />
+          </Card>
+        </Col>
+        <Col xs={24} sm={12} lg={6}>
+          <Card>
+            <Statistic
+              title="有效套餐"
+              value={memberStats?.activePackages || 0}
+              prefix={<GiftOutlined style={{ color: '#52c41a' }} />}
+              valueStyle={{ color: '#52c41a' }}
+              suffix="份"
             />
           </Card>
         </Col>

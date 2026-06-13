@@ -9,6 +9,8 @@ import {
   PlusCircleOutlined,
   UserOutlined,
   LogoutOutlined,
+  CrownOutlined,
+  GiftOutlined,
 } from '@ant-design/icons';
 import { useNavigate, useLocation, Outlet } from 'react-router-dom';
 import { useAuthStore } from '../store/auth';
@@ -28,6 +30,8 @@ function MainLayout() {
     { key: '/dashboard', icon: <DashboardOutlined />, label: '工作台' },
     { key: '/orders', icon: <UnorderedListOutlined />, label: '订单管理' },
     { key: '/orders/create', icon: <PlusCircleOutlined />, label: '录入收件单' },
+    { key: '/members', icon: <CrownOutlined />, label: '会员管理' },
+    { key: '/packages', icon: <GiftOutlined />, label: '套餐管理' },
     { key: '/stores', icon: <ShopOutlined />, label: '门店管理' },
     { key: '/staff', icon: <TeamOutlined />, label: '员工管理' },
     { key: '/clothing-types', icon: <AppstoreOutlined />, label: '衣物类型' },

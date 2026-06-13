@@ -69,3 +69,28 @@ export const ordersApi = {
   getVoucher: (id) => request.get(`/orders/${id}/voucher`),
   getStats: (params) => request.get('/orders/stats/summary', { params }),
 };
+
+export const membersApi = {
+  list: (params) => request.get('/members', { params }),
+  get: (id) => request.get(`/members/${id}`),
+  findByPhone: (phone) => request.get(`/members/phone/${phone}`),
+  findByMemberNo: (memberNo) => request.get(`/members/member-no/${memberNo}`),
+  register: (data) => request.post('/members/register', data),
+  recharge: (data) => request.post('/members/recharge', data),
+  purchasePackage: (data) => request.post('/members/purchase-package', data),
+  settleOrder: (data) => request.post('/members/settle-order', data),
+  update: (id, data) => request.patch(`/members/${id}`, data),
+  getRechargeRecords: (id) => request.get(`/members/${id}/recharge-records`),
+  getDeductionRecords: (id) => request.get(`/members/${id}/deduction-records`),
+  getMemberPackages: (id) => request.get(`/members/${id}/member-packages`),
+  getStats: () => request.get('/members/stats'),
+};
+
+export const packagesApi = {
+  list: () => request.get('/packages'),
+  active: () => request.get('/packages/active/list'),
+  get: (id) => request.get(`/packages/${id}`),
+  create: (data) => request.post('/packages', data),
+  update: (id, data) => request.patch(`/packages/${id}`, data),
+  remove: (id) => request.delete(`/packages/${id}`),
+};

@@ -44,6 +44,10 @@ export class CreateOrderDto {
   @IsOptional()
   customerAddress?: string;
 
+  @IsUUID()
+  @IsOptional()
+  memberId?: string;
+
   @IsNumber()
   @Min(0)
   @IsOptional()

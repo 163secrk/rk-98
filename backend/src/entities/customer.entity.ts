@@ -5,8 +5,10 @@ import {
   CreateDateColumn,
   UpdateDateColumn,
   OneToMany,
+  OneToOne,
 } from 'typeorm';
 import { Order } from './order.entity';
+import { Member } from './member.entity';
 
 @Entity('customers')
 export class Customer {
@@ -27,6 +29,9 @@ export class Customer {
 
   @OneToMany(() => Order, (order) => order.customer)
   orders: Order[];
+
+  @OneToOne(() => Member, (member) => member.customer)
+  member: Member;
 
   @CreateDateColumn()
   createdAt: Date;

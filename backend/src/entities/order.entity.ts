@@ -12,6 +12,7 @@ import { Store } from './store.entity';
 import { Staff } from './staff.entity';
 import { Customer } from './customer.entity';
 import { OrderItem } from './order-item.entity';
+import { Member } from './member.entity';
 
 export enum OrderStatus {
   RECEIVED = 'received',
@@ -55,6 +56,13 @@ export class Order {
 
   @Column()
   customerPhone: string;
+
+  @Column({ nullable: true })
+  memberId: string;
+
+  @ManyToOne(() => Member, { nullable: true })
+  @JoinColumn({ name: 'memberId' })
+  member: Member;
 
   @Column({ nullable: true })
   customerAddress: string;

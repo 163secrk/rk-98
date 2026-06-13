@@ -6,6 +6,7 @@ import { OrderItem } from '../entities/order-item.entity';
 import { Customer } from '../entities/customer.entity';
 import { Staff } from '../entities/staff.entity';
 import { CreateOrderDto, UpdateOrderStatusDto } from './dto/order.dto';
+import { MembersService, DeductItem } from '../members/members.service';
 import { v4 as uuidv4 } from 'uuid';
 
 @Injectable()
@@ -17,6 +18,7 @@ export class OrdersService {
     private readonly orderItemRepository: Repository<OrderItem>,
     @InjectRepository(Customer)
     private readonly customerRepository: Repository<Customer>,
+    private readonly membersService: MembersService,
   ) {}
 
   private generateOrderNo(): string {
@@ -54,6 +56,7 @@ export class OrdersService {
       storeId,
       staffId: user.id,
       customerId: customer.id,
+      memberId: createOrderDto.memberId || null,
       customerName: createOrderDto.customerName,
       customerPhone: createOrderDto.customerPhone,
       customerAddress: createOrderDto.customerAddress,
@@ -68,7 +71,31 @@ export class OrdersService {
       })),
     });
 
-    return this.orderRepository.save(order);
+    const savedOrder = await this.orderRepository.save(order);
+
+    if (createOrderDto.memberId) {
+      const deductItems: DeductItem[] = createOrderDto.items.map((item) => ({
+        clothingTypeId: item.clothingTypeId,
+        quantity: item.quantity,
+        unitPrice: item.unitPrice,
+      }));
+
+      try {
+        await this.membersService.deductForOrder(
+          createOrderDto.memberId,
+          savedOrder.id,
+          deductItems,
+          user,
+        );
+        savedOrder.paidAmount = totalAmount;
+        await this.orderRepository.save(savedOrder);
+      } catch (err) {
+        savedOrder.remark = (savedOrder.remark || '') + ` [会员扣款失败: ${err.message}]`;
+        await this.orderRepository.save(savedOrder);
+      }
+    }
+
+    return savedOrder;
   }
 
   async findAll(query: {
