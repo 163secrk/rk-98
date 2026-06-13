@@ -11,6 +11,8 @@ import {
   message,
   Modal,
   Card,
+  Form,
+  Descriptions,
 } from 'antd';
 import {
   PlusOutlined,
@@ -38,6 +40,10 @@ function OrderList() {
   const [allConsumables, setAllConsumables] = useState([]);
   const [selectedConsumables, setSelectedConsumables] = useState([]);
   const [consumableLoading, setConsumableLoading] = useState(false);
+  const [payModalOpen, setPayModalOpen] = useState(false);
+  const [payOrder, setPayOrder] = useState(null);
+  const [payLoading, setPayLoading] = useState(false);
+  const [payForm] = Form.useForm();
   const [filters, setFilters] = useState({
     keyword: '',
     status: undefined,
@@ -133,6 +139,17 @@ function OrderList() {
       return;
     }
 
+    if (nextStatus === 'delivered') {
+      const unpaid = Number(record.totalAmount) - Number(record.paidAmount);
+      if (unpaid > 0) {
+        setPayOrder(record);
+        payForm.resetFields();
+        payForm.setFieldsValue({ paidAmount: Number(unpaid.toFixed(2)) });
+        setPayModalOpen(true);
+        return;
+      }
+    }
+
     Modal.confirm({
       title: '确认操作',
       content: `确定将订单状态更新为「${statusMap[nextStatus].text}」吗？`,
@@ -146,6 +163,31 @@ function OrderList() {
         }
       },
     });
+  };
+
+  const handlePayAndDeliver = async () => {
+    if (!payOrder) return;
+    try {
+      const values = await payForm.validateFields();
+      const unpaid = Number(payOrder.totalAmount) - Number(payOrder.paidAmount);
+      if (Number(values.paidAmount) > unpaid) {
+        message.warning(`补缴金额不能超过待付金额 ¥${unpaid.toFixed(2)}`);
+        return;
+      }
+      setPayLoading(true);
+      await ordersApi.updateStatus(payOrder.id, {
+        status: 'delivered',
+        paidAmount: Number(values.paidAmount),
+      });
+      message.success('付款并取件成功');
+      setPayModalOpen(false);
+      loadList();
+    } catch (err) {
+      if (err.errorFields) return;
+      message.error(err.message || '操作失败');
+    } finally {
+      setPayLoading(false);
+    }
   };
 
   const handleConsumableQuantityChange = (index, value) => {
@@ -596,6 +638,54 @@ function OrderList() {
             <li>可回收耗材（如衣架、洗衣袋）会在订单完成时自动归还入库</li>
           </ul>
         </div>
+      </Modal>
+
+      <Modal
+        title="确认取件 - 补缴款项"
+        open={payModalOpen}
+        onCancel={() => setPayModalOpen(false)}
+        onOk={handlePayAndDeliver}
+        okText="确认付款并取件"
+        confirmLoading={payLoading}
+        destroyOnClose
+        width={480}
+      >
+        {payOrder && (
+          <>
+            <Card size="small" style={{ marginBottom: 16 }}>
+              <Descriptions column={1} size="small">
+                <Descriptions.Item label="订单号">{payOrder.orderNo}</Descriptions.Item>
+                <Descriptions.Item label="客户">{payOrder.customerName}</Descriptions.Item>
+                <Descriptions.Item label="总金额">
+                  <span style={{ color: '#f5222d', fontWeight: 'bold' }}>¥{Number(payOrder.totalAmount).toFixed(2)}</span>
+                </Descriptions.Item>
+                <Descriptions.Item label="已付金额">
+                  <span style={{ color: '#52c41a' }}>¥{Number(payOrder.paidAmount).toFixed(2)}</span>
+                </Descriptions.Item>
+                <Descriptions.Item label="待付金额">
+                  <span style={{ color: '#f5222d', fontWeight: 'bold' }}>
+                    ¥{(Number(payOrder.totalAmount) - Number(payOrder.paidAmount)).toFixed(2)}
+                  </span>
+                </Descriptions.Item>
+              </Descriptions>
+            </Card>
+            <Form form={payForm} layout="vertical">
+              <Form.Item
+                name="paidAmount"
+                label="补缴金额（元）"
+                rules={[{ required: true, message: '请输入补缴金额' }]}
+              >
+                <InputNumber
+                  style={{ width: '100%' }}
+                  min={0.01}
+                  precision={2}
+                  prefix="¥"
+                  placeholder="输入补缴金额"
+                />
+              </Form.Item>
+            </Form>
+          </>
+        )}
       </Modal>
     </div>
   );

@@ -82,6 +82,7 @@ function Consumables() {
 
   useEffect(() => {
     loadData();
+    loadAlerts();
   }, [keyword, filterType, filterStoreId]);
 
   useEffect(() => {

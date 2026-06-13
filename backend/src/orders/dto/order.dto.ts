@@ -106,4 +106,9 @@ export class UpdateOrderStatusDto {
   @Type(() => OrderConsumableDto)
   @IsOptional()
   consumables?: OrderConsumableDto[];
+
+  @IsNumber()
+  @Min(0.01)
+  @IsOptional()
+  paidAmount?: number;
 }

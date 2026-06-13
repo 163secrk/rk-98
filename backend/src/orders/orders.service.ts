@@ -186,6 +186,9 @@ export class OrdersService {
     }
 
     if (updateDto.status === OrderStatus.DELIVERED) {
+      if (updateDto.paidAmount && Number(updateDto.paidAmount) > 0) {
+        order.paidAmount = Number(order.paidAmount) + Number(updateDto.paidAmount);
+      }
       const unpaid = Number(order.totalAmount) - Number(order.paidAmount);
       if (unpaid > 0) {
         throw new BadRequestException(
